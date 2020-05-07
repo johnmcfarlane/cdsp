@@ -7,6 +7,8 @@
 
 #include "dsp_types.h"
 
+#include <cnl/limits.h>
+
 namespace cdsp
 {
 /// Virtual_float implements floating point arithmetic with fixed-point.
@@ -71,6 +73,8 @@ public:
     /// Square Root
     template<class S>
     friend virtual_float<S> sqrt(virtual_float<S> const& rhs);
+    template<class S>
+    friend constexpr virtual_float<S> make_virtual_float(S&& mantissa, int exponent);
 private:
     /// Normalization
     void normalize();
@@ -541,7 +545,78 @@ inline virtual_float<q8_40> sqrt(virtual_float<q8_40> const& rhs)
     ret.normalize();
     return ret;
 }
+
+template<typename T>
+constexpr virtual_float<T> make_virtual_float(T&& mantissa, int exponent)
+{
+    virtual_float<T> n(mantissa);
+    n.m_exponent = exponent;
+    return n;
+}
 #endif
 
 } // namespace cdsp
+
+namespace cnl {
+    template<typename T>
+    struct numeric_limits<cdsp::virtual_float<T>> : private numeric_limits<T> {
+    private:
+        using _base = numeric_limits<T>;
+        using _type = T;
+    public:
+        static constexpr bool is_specialized = _base::is_specialized;
+
+        static constexpr T min() noexcept {
+            return cdsp::make_virtual_float<T>(
+                    cnl::numeric_limits<T>::min(),
+                    cnl::numeric_limits<int>::min());
+        }
+
+        static constexpr T max() noexcept {
+            return cdsp::make_virtual_float<T>(
+                    cnl::numeric_limits<T>::max(),
+                    cnl::numeric_limits<int>::max());
+        }
+
+
+        static constexpr T lowest() noexcept {
+            return cdsp::make_virtual_float<T>(
+                    _base::lowest(),
+                    cnl::numeric_limits<int>::lowest());
+        }
+
+        static constexpr int digits = _base::digits;
+        static constexpr int digits10 = _base::digits10;
+        static constexpr int max_digits10 = _base::max_digits10;
+
+        static constexpr bool is_integer = false;
+        static constexpr bool is_exact = true;
+
+        static constexpr float epsilon() noexcept 
+        {
+            // ought to be smaller
+            return cdsp::make_virtual_float<T>(1, 1-_base::digits);
+        }
+
+        static constexpr T round_error() noexcept
+        {
+            return _type{.5};
+        }
+
+        static constexpr int min_exponent = cnl::numeric_limits<int>::min();
+        static constexpr int max_exponent = cnl::numeric_limits<int>::min();
+        static constexpr bool has_infinity = _base::has_infinity;
+        static constexpr bool has_quiet_NaN = _base::has_quiet_NaN;
+        static constexpr bool has_signaling_NaN = _base::has_signaling_NaN;
+        static constexpr std::float_denorm_style has_denorm = _base::has_denorm;
+        static constexpr bool has_denorm_loss = _base::has_denorm_loss;
+
+        static constexpr bool is_iec559 = false;
+        static constexpr bool is_bounded = _base::is_bounded;
+        static constexpr bool is_modulo = _base::is_modulo;
+        static constexpr bool traps = _base::traps;
+        static constexpr std::float_round_style round_style = _base::round_style;
+    };
+} // namespace std
+
 #endif //CDSP_VIRTUAL_FLOAT
